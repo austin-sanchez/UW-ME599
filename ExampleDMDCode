@@ -1,0 +1,52 @@
+clc; clear all; close all
+% Data 'JS00001.mat from https://physionet.org/content/ecg-arrhythmia/1.0.0/
+load('JS00001.mat')
+X = val;
+time_delay_steps = 1;
+X_data = X(:,1:end-time_delay_steps);
+X_prime = X(:,2:end-(time_delay_steps-1));
+for i = 2:time_delay_steps
+   X_data = [X_data; X(:,i:end-(time_delay_steps-i+1))];
+   X_prime = [X_prime; X(:,(i+1):end-(time_delay_steps-i))];
+end
+
+[U, S, V] = svd(X_data, 'econ');
+
+% Step 2: Compute reduced best fit linear operator with leading 'r' eigenvalues
+A_tilde = U' * X_prime * V / S;
+
+% Step 3: Obtain spectral decomposition of A_approx
+[W, Lambda] = eig(A_tilde);
+
+% Step 4: Construct high-dimensional DMD mode matrix
+Phi = X_prime * ( V / S) * W;
+
+% Step 5: Compute mode amplitudes 
+x_1_approx = S * V(1,:)';
+b = (W * Lambda) \ x_1_approx;
+
+% Step 6: Compute the best fit operator based on Eq. 7.17
+A = Phi * Lambda / Phi;
+
+
+
+
+k_max = length(X_data);
+X_forecast = zeros(12*time_delay_steps,k_max);
+disp(length(X_forecast))
+X_forecast(:,1) = X_prime(:,k_max);
+for k = 1:(k_max-1)
+    X_forecast(:,k+1) = real(A * X_forecast(:,k));
+end
+
+time_data = 0:length(X_data);
+time_forecast = length(X):2*length(X)-2;
+
+% Plot the original dataset and the forecasted data
+figure()
+plot(time_data, X(1,:),'-b','LineWidth',1.5)
+hold on;
+plot(time_forecast, X_forecast(1,:),'--b','LineWidth',1.5)
+hold on;
+
+
